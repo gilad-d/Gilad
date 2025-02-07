@@ -1,7 +1,6 @@
 import tweepy
 import os
 from flask import Flask
-import time
 
 app = Flask(__name__)
 
@@ -17,22 +16,22 @@ auth.set_access_token(
 
 api = tweepy.API(auth)
 
-# מחלקה למעקב אחרי ציוצים
-class MyStreamListener(tweepy.StreamListener):
-    def on_status(self, status):
+# הגרסה החדשה משתמשת ב-StreamingClient במקום StreamListener
+class MyStream(tweepy.StreamingClient):
+    def on_tweet(self, tweet):
         try:
             # מתעלם מציוצים של הבוט עצמו
-            if status.user.id == api.verify_credentials().id:
+            if tweet.author_id == api.verify_credentials().id:
                 return
             
             # אם מישהו מצייץ על "תהילה"
-            if "תהילה" in status.text:
-                reply = f"@{status.user.screen_name} 'עוד יספרו לבנינו, על תהילת הימים!'"
+            if "תהילה" in tweet.text:
+                reply = f"@{tweet.author.username} 'עוד יספרו לבנינו, על תהילת הימים!'"
                 api.update_status(
                     status=reply,
-                    in_reply_to_status_id=status.id
+                    in_reply_to_status_id=tweet.id
                 )
-                print(f"הגבתי לציוץ: {status.text}")
+                print(f"הגבתי לציוץ: {tweet.text}")
                 
         except Exception as e:
             print(f"שגיאה: {e}")
@@ -43,13 +42,13 @@ def home():
 
 def start_stream():
     try:
-        myStreamListener = MyStreamListener()
-        myStream = tweepy.Stream(auth=api.auth, listener=myStreamListener)
-        myStream.filter(track=['תהילה'], languages=['he'], is_async=True)
+        # שים לב שכאן צריך את ה-Bearer Token במקום OAuth
+        stream = MyStream(bearer_token=os.environ.get('TWITTER_BEARER_TOKEN'))
+        stream.filter(track=['תהילה'], languages=['he'])
     except Exception as e:
         print(f"שגיאה בהפעלת הסטרים: {e}")
 
 if __name__ == "__main__":
-    start_stream()  # מתחיל את המעקב אחרי ציוצים
+    start_stream()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 3000)))
     
